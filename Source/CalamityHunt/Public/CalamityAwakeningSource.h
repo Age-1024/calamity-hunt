@@ -19,6 +19,9 @@ class CALAMITYHUNT_API ACalamityAwakeningSource : public AActor
 public:
     ACalamityAwakeningSource();
 
+    virtual void OnConstruction(const FTransform& Transform) override;
+    virtual void BeginPlay() override;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Awakening")
     TObjectPtr<USphereComponent> Trigger;
 
@@ -31,14 +34,17 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Awakening", meta=(ClampMin="50.0"))
     float UseRadius = 250.0f;
 
-    UPROPERTY(Replicated, BlueprintReadOnly, Category="Awakening")
+    UPROPERTY(ReplicatedUsing=OnRep_Consumed, BlueprintReadOnly, Category="Awakening")
     bool bConsumed = false;
 
-    /** Must be called by the owning character's server RPC; performs server-side range and state checks. */
+    /** Called by the claiming character's server RPC; performs server-side range and state checks. */
     bool TryGrantTo(AActor* ClaimingActor);
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+    UFUNCTION()
     void OnRep_Consumed();
+
+    void ApplyConsumedState();
 };

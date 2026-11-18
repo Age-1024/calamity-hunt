@@ -1,20 +1,13 @@
-# 灰盒原型实现状态
+# 修复与功能更新记录
 
-## 新增：稀有觉醒源与觉醒冲刺
+## 本次修复：觉醒源 RepNotify ��范围配置
 
-- 新增可放置的单次使用觉醒源 `ACalamityAwakeningSource`，可配置人、鬼、僵尸、怪物四类印记。
-- 觉醒组件 `UCalamityAwakeningComponent` 可添加到玩家角色或蓝图子类，负责服务器权威授予印记、能量回复、冷却及冲刺技能。
-- 客户端仅通过所属角色组件的 Server RPC 请求使用觉醒源或释放技能；源在服务器检查距离、是否已消耗和玩家是否已有印记。
-- 技能原型为直线冲刺，不造成伤害；能量消耗、回复、冲刺速度、垂直速度和冷却均可编辑。
-- 印记、能量、冷却和觉醒源消耗状态复制给客户端。
+- 将 `bConsumed` 改为 `ReplicatedUsing=OnRep_Consumed`，客户端收到状态变化后隐藏已消耗觉醒源并关闭碰撞。
+- 服务端成功授予后显式调用同一状态应用函数，因为服务端本地属性赋值不会自动执行 RepNotify。
+- `OnConstruction` 根据 `UseRadius` 更新球形组件半径，并按配置印记显示不同的中文灰盒标签。
+- 授予前服务端额外确认请求者是存活的 `ACalamityCharacter`，并再次按配置半径校验。
+- 成功消耗后调用 `ForceNetUpdate`，请求尽快同步变化。
 
-## 使用步骤
+## 未验证事项
 
-1. 将 `UCalamityAwakeningComponent` 添加到玩家角色 Blueprint。
-2. 在关卡放置 `ACalamityAwakeningSource` 或 Blueprint 子类，设置 `MarkToGrant` 和 `UseRadius`。
-3. 输入映射调用组件 `RequestClaimSource(SourceActor)`；释放技能调用 `RequestCastAbility()`。
-4. 运行服务器与客户端，验证只有一个玩家能消费单次觉醒源。
-
-## 静态检查/限制
-
-代码采用独立 Actor 和组件实现，不依赖联盟接口。未在 Unreal Engine 5.5 环境执行 UHT 或 C++ 编译；本地需要重点验证组件 Server RPC 所属 Actor 的网络拥有权、源 Actor 参数解析、复制字段和多人竞态。觉醒事件目前是单步互动，没有试炼、打断、反噬、角色差异技能或 UI。
+这是代码级修正；没有 Unreal Engine 5.5 环境，未执行 UHT、C++ 构建或 PIE 多客户端测试。需要验证 RepNotify、关卡实例属性和碰撞组件行为。此前发现的其他跨文件接口/构建问题仍需以本地完整编译结果为准。
