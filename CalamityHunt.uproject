@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.5",
+  "Category": "Games",
+  "Description": "PvPvE supernatural survival arena graybox prototype.",
+  "Modules": [
+    {
+      "Name": "CalamityHunt",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

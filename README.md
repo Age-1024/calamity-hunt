@@ -1,66 +1,40 @@
 # 万煞猎场（暂定名）
 
-开源 UE5 PvPvE 超自然生存竞技灰盒原型。
+开源 UE5 PvPvE 超自然生存竞技原型，目标是逐步验证“枪战、淘汰、临时合作、争夺皇印”的核心循环。
 
-## 当前目标
+> 当前仓库包含 UE 5.5 C++ 游戏模块骨架及第一批服务器权威玩法代码。它是早期原型源码，不是已经完整制作、编译验证或可直接上线的成品游戏。
 
-先实现一个可运行、可测试的 4 人灰盒原型：
+## 当前源码
 
-- Server-authoritative 玩家与枪战
-- 普通淘汰与最后存活胜利
-- 皇祭坛可引导
-- 皇印拾取、掉落、持有计时与胜负
-- 临时结盟的创建与解除
-- 结构化对局阶段配置
-- 基础日志与测试清单
+- UE 5.5 项目文件和 Game / Editor Target
+- 服务端权威基础 hitscan 射击与生命值淘汰
+- 对局阶段：搜刮、皇印争夺、血月、结束
+- 皇印认领、掉落、持有计时与胜利判定
+- 最后一名存活玩家获胜
+- 超时结算的灰盒占位规则
 
-## 不承诺首版包含
+## 文档
 
-- 完整美术与地图
-- 异灵驯服系统
-- 完整觉醒技能
-- 商业匹配或账号服务
-- 防作弊完整方案
-- 完整移动端或主机支持
+- `Docs/GAME_DESIGN.md` — 核心玩法
+- `Docs/TECH_DESIGN.md` — 网络与模块设计
+- `Docs/ACCEPTANCE_CHECKLIST.md` — 灰盒验收
+- `Docs/LEGAL.md` — 开源和素材边界
 
-## 建议引擎
+## 在 UE 5.5 中构建
 
-UE 5.5 或兼容版本。核心逻辑优先使用 C++，表现与配置使用 Blueprint/Data Assets。
+1. 安装 Unreal Engine 5.5 和对应 C++ 编译工具。
+2. 克隆仓库，右键 `CalamityHunt.uproject` 生成 IDE 项目文件。
+3. 用 IDE 编译 `CalamityHuntEditor` Development 配置。
+4. 在编辑器中创建灰盒地图，放置 PlayerStart，并将地图设为启动地图。
+5. 创建 `BP_CalamityCharacter` 子类，添加网格、相机和输入；将 Fire 输入绑定到 `RequestFire`，交互输入调用 GameMode 的 `TryClaimCrown` / `DropCrown`。
+6. 设置合适的碰撞、武器射线目标和测试地图。服务器可使用 `-server -log` 启动，客户端通过 `open 127.0.0.1` 连接本机测试服。
 
-## 源码方向
+目前没有提交二进制地图、模型、动画、音效或输入资产。角色 C++ 类提供玩法逻辑，实际可玩角色需在编辑器中配置相机、网格与输入。所有交互入口在正式多人版本中都应补充服务器端距离、视线、状态与权限校验。
 
-```text
-CalamityCore       公共状态、配置、事件与日志
-CalamityCombat     服务器权威射击、命中与死亡
-CalamityCrown      皇祭坛、皇印与胜负
-CalamityAlliance   临时结盟与解除
-CalamityFlow       对局阶段与数据驱动流程
-CalamityTests      核心系统与联机测试
-```
+## 当前限制
 
-详细内容请查看：
-
-- `Docs/GAME_DESIGN.md`
-- `Docs/TECH_DESIGN.md`
-- `Docs/ACCEPTANCE_CHECKLIST.md`
-- `Docs/LEGAL.md`
-
-## 运行要求
-
-首版仍在设计和实现中。提交完整 `.uproject` 前，需要在 UE5 环境中生成项目文件并验证：
-
-- 4 名测试玩家能连接 Dedicated Server
-- 基础射击能触发服务器权威伤害与淘汰
-- 皇印可拾取、掉落、复位与计时
-- 最后存活玩家立即胜利
-- 对局超时或异常退出有明确处理
+尚未实现或验证：Dedicated Server 多客户端完整测试、玩家移动输入资产、皇祭坛范围与引导进度、结盟、异灵 AI/驯服、觉醒、贡献分、反作弊和商业服务。对局配置目前由 C++ 默认值提供，后续再迁移到 Data Asset。
 
 ## 开源边界
 
-MIT 许可证适用于仓库中由贡献者创建且有权发布的代码。仓库不会随意包含：
-
-- Unreal Engine 源码或专有引擎组件
-- 未获授权的模型、贴图、音效、动画或地图
-- 受商标、版权或第三方许可限制的素材
-
-另见 `Docs/LEGAL.md`。
+仓库中的原创代码和文档采用 MIT License。许可证不覆盖 Unreal Engine、第三方插件或外部素材。不要提交未获授权的模型、音效、动画、地图和其他资产。
