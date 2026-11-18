@@ -127,6 +127,30 @@ void ACalamityCharacter::ServerCancelCrownChannel_Implementation()
     }
 }
 
+void ACalamityCharacter::RequestPickupDroppedCrown()
+{
+    if (HasAuthority())
+    {
+        ServerPickupDroppedCrown_Implementation();
+    }
+    else
+    {
+        ServerPickupDroppedCrown();
+    }
+}
+
+void ACalamityCharacter::ServerPickupDroppedCrown_Implementation()
+{
+    if (bEliminated || !GetController())
+    {
+        return;
+    }
+    if (ACalamityGameMode* GameMode = GetWorld()->GetAuthGameMode<ACalamityGameMode>())
+    {
+        GameMode->TryPickupDroppedCrown(GetController());
+    }
+}
+
 void ACalamityCharacter::FireAuthoritative()
 {
     if (!HasAuthority() || bEliminated || bIsReloading || !GetWorld() || AmmoInMagazine <= 0)

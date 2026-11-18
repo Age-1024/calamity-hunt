@@ -59,6 +59,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Interaction|Crown")
     void RequestCancelCrownChannel();
 
+    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown")
+    void RequestPickupDroppedCrown();
+
     UFUNCTION(BlueprintPure, Category = "Combat")
     bool IsEliminated() const { return bEliminated; }
 
@@ -80,6 +83,9 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void ServerCancelCrownChannel();
+
+    UFUNCTION(Server, Reliable)
+    void ServerPickupDroppedCrown();
 
 private:
     float LastServerFireTime = -1000.0f;

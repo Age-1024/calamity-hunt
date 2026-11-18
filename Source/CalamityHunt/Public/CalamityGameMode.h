@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "CalamityGameState.h"
+#include "CalamityCrownPickup.h"
 #include "CalamityGameMode.generated.h"
 
 UCLASS()
@@ -42,12 +43,17 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Altar", meta = (ClampMin = "0.1"))
     float CrownChannelDurationSeconds = 5.0f;
 
-    // Called only on the server after the owning character forwards an interaction request.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Pickup", meta = (ClampMin = "50.0"))
+    float CrownPickupRadius = 180.0f;
+
     UFUNCTION(BlueprintCallable, Category = "Crown")
     bool BeginCrownChannel(AController* ClaimingController);
 
     UFUNCTION(BlueprintCallable, Category = "Crown")
     void CancelCrownChannel(AController* ClaimingController);
+
+    UFUNCTION(BlueprintCallable, Category = "Crown")
+    bool TryPickupDroppedCrown(AController* ClaimingController);
 
     UFUNCTION(BlueprintCallable, Category = "Crown")
     void DropCrown(AController* HolderController);
@@ -57,6 +63,7 @@ public:
 private:
     float CrownDroppedElapsedSeconds = 0.0f;
     bool bCrownIsDropped = false;
+    TObjectPtr<ACalamityCrownPickup> DroppedCrown = nullptr;
 
     ACalamityGameState* GetCalamityGameState() const;
     bool IsControllerAlive(const AController* Controller) const;
@@ -65,4 +72,5 @@ private:
     void SetWinner(APlayerState* Winner);
     void ResolveTimeout();
     void UpdateCrownChannel(float DeltaSeconds, ACalamityGameState* State);
+    void ResetDroppedCrown();
 };
