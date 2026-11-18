@@ -53,7 +53,6 @@ void ACalamityGameMode::Tick(float DeltaSeconds)
     }
 
     UpdateCrownChannel(DeltaSeconds, State);
-
     if (bCrownIsDropped)
     {
         CrownDroppedElapsedSeconds += DeltaSeconds;
@@ -73,9 +72,23 @@ void ACalamityGameMode::Tick(float DeltaSeconds)
     }
 }
 
+void ACalamityGameMode::Logout(AController* Exiting)
+{
+    BreakAlliance(Exiting);
+    CancelCrownChannel(Exiting);
+    if (ACalamityGameState* State = GetCalamityGameState())
+    {
+        if (Exiting && State->CrownHolder == Exiting->PlayerState)
+        {
+            DropCrown(Exiting);
+        }
+    }
+    Super::Logout(Exiting);
+}
+
 bool ACalamityGameMode::BeginCrownChannel(AController* ClaimingController)
 {
-    if (!HasAuthority() || !ClaimingController || !IsControllerAlive(ClaimingController))
+    if (!HasAuthority() || !ClaimingController || !ClaimingController->PlayerState || !IsControllerAlive(ClaimingController))
     {
         return false;
     }
@@ -86,7 +99,6 @@ bool ACalamityGameMode::BeginCrownChannel(AController* ClaimingController)
     {
         return false;
     }
-
     if (State->CrownChannelingPlayer && State->CrownChannelingPlayer != ClaimingController->PlayerState)
     {
         return false;
@@ -103,12 +115,13 @@ void ACalamityGameMode::CancelCrownChannel(AController* ClaimingController)
     {
         return;
     }
-
-    ACalamityGameState* State = GetCalamityGameState();
-    if (State && State->CrownChannelingPlayer == ClaimingController->PlayerState)
+    if (ACalamityGameState* State = GetCalamityGameState())
     {
-        State->CrownChannelingPlayer = nullptr;
-        State->CrownChannelProgressSeconds = 0.0f;
+        if (State->CrownChannelingPlayer == ClaimingController->PlayerState)
+        {
+            State->CrownChannelingPlayer = nullptr;
+            State->CrownChannelProgressSeconds = 0.0f;
+        }
     }
 }
 
@@ -119,19 +132,9 @@ void ACalamityGameMode::UpdateCrownChannel(float DeltaSeconds, ACalamityGameStat
         return;
     }
 
-    AController* ChannelingController = nullptr;
-    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-    {
-        APlayerController* PC = It->Get();
-        if (PC && PC->PlayerState == State->CrownChannelingPlayer)
-        {
-            ChannelingController = PC;
-            break;
-        }
-    }
-
-    if (!ChannelingController || !IsControllerAlive(ChannelingController) ||
-        !IsAtCrownAltar(ChannelingController) || !IsCrownContestOpen(State) || State->CrownHolder || bCrownIsDropped)
+    AController* ChannelingController = FindControllerForPlayerState(State->CrownChannelingPlayer);
+    if (!ChannelingController || !IsControllerAlive(ChannelingController) || !IsAtCrownAltar(ChannelingController) ||
+        !IsCrownContestOpen(State) || State->CrownHolder || bCrownIsDropped)
     {
         State->CrownChannelingPlayer = nullptr;
         State->CrownChannelProgressSeconds = 0.0f;
@@ -145,14 +148,13 @@ void ACalamityGameMode::UpdateCrownChannel(float DeltaSeconds, ACalamityGameStat
         State->CrownHoldProgressSeconds = 0.0f;
         State->CrownChannelingPlayer = nullptr;
         State->CrownChannelProgressSeconds = 0.0f;
-        bCrownIsDropped = false;
-        CrownDroppedElapsedSeconds = 0.0f;
     }
 }
 
 bool ACalamityGameMode::TryPickupDroppedCrown(AController* ClaimingController)
 {
-    if (!HasAuthority() || !ClaimingController || !IsControllerAlive(ClaimingController) || !DroppedCrown)
+    if (!HasAuthority() || !ClaimingController || !ClaimingController->PlayerState ||
+        !IsControllerAlive(ClaimingController) || !DroppedCrown)
     {
         return false;
     }
@@ -182,9 +184,7 @@ void ACalamityGameMode::DropCrown(AController* HolderController)
     {
         return;
     }
-
     ACalamityGameState* State = GetCalamityGameState();
-    APawn* Pawn = HolderController->GetPawn();
     if (!State || State->CrownHolder != HolderController->PlayerState)
     {
         return;
@@ -194,33 +194,151 @@ void ACalamityGameMode::DropCrown(AController* HolderController)
     State->CrownHoldProgressSeconds = 0.0f;
     State->CrownChannelingPlayer = nullptr;
     State->CrownChannelProgressSeconds = 0.0f;
-
     if (DroppedCrown)
     {
         DroppedCrown->Destroy();
         DroppedCrown = nullptr;
     }
 
+    const APawn* Pawn = HolderController->GetPawn();
     const FVector DropLocation = Pawn ? Pawn->GetActorLocation() : CrownAltarLocation;
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
     DroppedCrown = GetWorld()->SpawnActor<ACalamityCrownPickup>(
         ACalamityCrownPickup::StaticClass(), DropLocation, FRotator::ZeroRotator, SpawnParams);
-    bCrownIsDropped = true;
+    bCrownIsDropped = DroppedCrown != nullptr;
     CrownDroppedElapsedSeconds = 0.0f;
 }
 
-void ACalamityGameMode::HandlePlayerEliminated(AController* EliminatedController)
+bool ACalamityGameMode::RequestAllianceOffer(AController* Proposer, APlayerState* TargetPlayerState)
+{
+    if (!HasAuthority() || !Proposer || !Proposer->PlayerState || !TargetPlayerState ||
+        Proposer->PlayerState == TargetPlayerState || !IsControllerAlive(Proposer))
+    {
+        return false;
+    }
+
+    ACalamityGameState* State = GetCalamityGameState();
+    AController* TargetController = FindControllerForPlayerState(TargetPlayerState);
+    if (!State || State->CurrentPhase == ECalamityMatchPhase::Finished || !TargetController ||
+        !IsControllerAlive(TargetController) || IsInAlliance(Proposer->PlayerState) || IsInAlliance(TargetPlayerState))
+    {
+        return false;
+    }
+
+    const APawn* ProposerPawn = Proposer->GetPawn();
+    const APawn* TargetPawn = TargetController->GetPawn();
+    if (!ProposerPawn || !TargetPawn || FVector::DistSquared(ProposerPawn->GetActorLocation(), TargetPawn->GetActorLocation()) >
+        FMath::Square(AllianceOfferDistance))
+    {
+        return false;
+    }
+
+    for (const FCalamityAllianceOffer& Offer : State->AllianceOffers)
+    {
+        if (Offer.Sender == Proposer->PlayerState || Offer.Recipient == Proposer->PlayerState ||
+            Offer.Sender == TargetPlayerState || Offer.Recipient == TargetPlayerState)
+        {
+            return false;
+        }
+    }
+
+    FCalamityAllianceOffer NewOffer;
+    NewOffer.Sender = Proposer->PlayerState;
+    NewOffer.Recipient = TargetPlayerState;
+    State->AllianceOffers.Add(NewOffer);
+    return true;
+}
+
+bool ACalamityGameMode::AcceptAllianceOffer(AController* Accepter)
+{
+    if (!HasAuthority() || !Accepter || !Accepter->PlayerState || !IsControllerAlive(Accepter))
+    {
+        return false;
+    }
+
+    ACalamityGameState* State = GetCalamityGameState();
+    if (!State || State->CurrentPhase == ECalamityMatchPhase::Finished || IsInAlliance(Accepter->PlayerState))
+    {
+        return false;
+    }
+
+    const int32 OfferIndex = State->AllianceOffers.IndexOfByPredicate(
+        [Accepter](const FCalamityAllianceOffer& Offer) { return Offer.Recipient == Accepter->PlayerState; });
+    if (OfferIndex == INDEX_NONE)
+    {
+        return false;
+    }
+
+    const FCalamityAllianceOffer Offer = State->AllianceOffers[OfferIndex];
+    AController* SenderController = FindControllerForPlayerState(Offer.Sender);
+    const APawn* SenderPawn = SenderController ? SenderController->GetPawn() : nullptr;
+    const APawn* AccepterPawn = Accepter->GetPawn();
+    if (!SenderController || !IsControllerAlive(SenderController) || IsInAlliance(Offer.Sender) ||
+        !SenderPawn || !AccepterPawn || FVector::DistSquared(SenderPawn->GetActorLocation(), AccepterPawn->GetActorLocation()) >
+        FMath::Square(AllianceOfferDistance))
+    {
+        State->AllianceOffers.RemoveAt(OfferIndex);
+        return false;
+    }
+
+    FCalamityAlliancePair NewAlliance;
+    NewAlliance.First = Offer.Sender;
+    NewAlliance.Second = Offer.Recipient;
+    State->Alliances.Add(NewAlliance);
+    State->AllianceOffers.RemoveAt(OfferIndex);
+    return true;
+}
+
+void ACalamityGameMode::BreakAlliance(AController* RequestingController)
+{
+    if (!HasAuthority() || !RequestingController || !RequestingController->PlayerState)
+    {
+        return;
+    }
+    if (ACalamityGameState* State = GetCalamityGameState())
+    {
+        const APlayerState* PlayerState = RequestingController->PlayerState;
+        State->Alliances.RemoveAll([PlayerState](const FCalamityAlliancePair& Pair)
+        {
+            return Pair.First == PlayerState || Pair.Second == PlayerState;
+        });
+        State->AllianceOffers.RemoveAll([PlayerState](const FCalamityAllianceOffer& Offer)
+        {
+            return Offer.Sender == PlayerState || Offer.Recipient == PlayerState;
+        });
+    }
+}
+
+bool ACalamityGameMode::AreAllied(const APlayerState* First, const APlayerState* Second) const
+{
+    if (!First || !Second || First == Second)
+    {
+        return false;
+    }
+    const ACalamityGameState* State = GetCalamityGameState();
+    return State && State->Alliances.ContainsByPredicate([First, Second](const FCalamityAlliancePair& Pair)
+    {
+        return (Pair.First == First && Pair.Second == Second) || (Pair.First == Second && Pair.Second == First);
+    });
+}
+
+void ACalamityGameMode::HandlePlayerEliminated(AController* EliminatedController, AController* KillerController)
 {
     if (!HasAuthority())
     {
         return;
     }
-
     ACalamityGameState* State = GetCalamityGameState();
     if (!State || State->CurrentPhase == ECalamityMatchPhase::Finished)
     {
         return;
+    }
+
+    if (KillerController && KillerController != EliminatedController && KillerController->PlayerState &&
+        (!EliminatedController || !AreAllied(KillerController->PlayerState, EliminatedController->PlayerState)))
+    {
+        KillerController->PlayerState->SetScore(KillerController->PlayerState->GetScore() + EliminationScore);
     }
 
     if (State->CrownHolder && EliminatedController && State->CrownHolder == EliminatedController->PlayerState)
@@ -228,6 +346,7 @@ void ACalamityGameMode::HandlePlayerEliminated(AController* EliminatedController
         DropCrown(EliminatedController);
     }
     CancelCrownChannel(EliminatedController);
+    BreakAlliance(EliminatedController);
 
     APlayerState* LastAlivePlayerState = nullptr;
     int32 AliveCount = 0;
@@ -240,7 +359,6 @@ void ACalamityGameMode::HandlePlayerEliminated(AController* EliminatedController
             LastAlivePlayerState = PC->PlayerState;
         }
     }
-
     if (AliveCount == 1)
     {
         SetWinner(LastAlivePlayerState);
@@ -264,18 +382,40 @@ bool ACalamityGameMode::IsControllerAlive(const AController* Controller) const
 
 bool ACalamityGameMode::IsAtCrownAltar(const AController* Controller) const
 {
-    if (!Controller || !Controller->GetPawn())
-    {
-        return false;
-    }
-    return FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), CrownAltarLocation) <=
-        FMath::Square(CrownAltarUseRadius);
+    return Controller && Controller->GetPawn() &&
+        FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), CrownAltarLocation) <= FMath::Square(CrownAltarUseRadius);
 }
 
 bool ACalamityGameMode::IsCrownContestOpen(const ACalamityGameState* State) const
 {
     return State && (State->CurrentPhase == ECalamityMatchPhase::CrownContest ||
         State->CurrentPhase == ECalamityMatchPhase::BloodMoon);
+}
+
+AController* ACalamityGameMode::FindControllerForPlayerState(const APlayerState* PlayerState) const
+{
+    if (!PlayerState || !GetWorld())
+    {
+        return nullptr;
+    }
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* PC = It->Get();
+        if (PC && PC->PlayerState == PlayerState)
+        {
+            return PC;
+        }
+    }
+    return nullptr;
+}
+
+bool ACalamityGameMode::IsInAlliance(const APlayerState* PlayerState) const
+{
+    const ACalamityGameState* State = GetCalamityGameState();
+    return State && State->Alliances.ContainsByPredicate([PlayerState](const FCalamityAlliancePair& Pair)
+    {
+        return Pair.First == PlayerState || Pair.Second == PlayerState;
+    });
 }
 
 void ACalamityGameMode::ResetDroppedCrown()
@@ -306,6 +446,7 @@ void ACalamityGameMode::SetWinner(APlayerState* Winner)
         State->CurrentPhase = ECalamityMatchPhase::Finished;
         State->CrownChannelingPlayer = nullptr;
         State->CrownChannelProgressSeconds = 0.0f;
+        State->AllianceOffers.Reset();
     }
 }
 
@@ -316,7 +457,6 @@ void ACalamityGameMode::ResolveTimeout()
     {
         return;
     }
-
     if (State->CrownHolder)
     {
         SetWinner(State->CrownHolder);
@@ -324,6 +464,7 @@ void ACalamityGameMode::ResolveTimeout()
     }
 
     APlayerState* BestPlayerState = nullptr;
+    float BestScore = -TNumericLimits<float>::Max();
     float BestHealth = -1.0f;
     int32 BestPlayerId = MAX_int32;
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -335,9 +476,12 @@ void ACalamityGameMode::ResolveTimeout()
         }
         const ACalamityCharacter* Character = Cast<ACalamityCharacter>(PC->GetPawn());
         const float Health = Character ? Character->GetHealth() : 0.0f;
+        const float Score = PC->PlayerState->GetScore();
         const int32 PlayerId = PC->PlayerState->GetPlayerId();
-        if (Health > BestHealth || (FMath::IsNearlyEqual(Health, BestHealth) && PlayerId < BestPlayerId))
+        if (Score > BestScore || (FMath::IsNearlyEqual(Score, BestScore) &&
+            (Health > BestHealth || (FMath::IsNearlyEqual(Health, BestHealth) && PlayerId < BestPlayerId))))
         {
+            BestScore = Score;
             BestHealth = Health;
             BestPlayerId = PlayerId;
             BestPlayerState = PC->PlayerState;

@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "CalamityCharacter.generated.h"
 
+class APlayerState;
+
 UCLASS()
 class CALAMITYHUNT_API ACalamityCharacter : public ACharacter
 {
@@ -62,6 +64,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Interaction|Crown")
     void RequestPickupDroppedCrown();
 
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    void RequestAllianceOffer(APlayerState* TargetPlayerState);
+
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    void RequestAcceptAlliance();
+
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    void RequestBreakAlliance();
+
     UFUNCTION(BlueprintPure, Category = "Combat")
     bool IsEliminated() const { return bEliminated; }
 
@@ -87,11 +98,20 @@ protected:
     UFUNCTION(Server, Reliable)
     void ServerPickupDroppedCrown();
 
+    UFUNCTION(Server, Reliable)
+    void ServerRequestAllianceOffer(APlayerState* TargetPlayerState);
+
+    UFUNCTION(Server, Reliable)
+    void ServerAcceptAlliance();
+
+    UFUNCTION(Server, Reliable)
+    void ServerBreakAlliance();
+
 private:
     float LastServerFireTime = -1000.0f;
     bool bIsReloading = false;
 
     void FireAuthoritative();
     void ReloadAuthoritative();
-    void Eliminate();
+    void Eliminate(AController* KillerController);
 };

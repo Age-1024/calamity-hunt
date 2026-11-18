@@ -18,6 +18,7 @@ public:
 
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
+    virtual void Logout(AController* Exiting) override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Match|Timing", meta = (ClampMin = "1.0"))
     float MatchDurationSeconds = 900.0f;
@@ -46,6 +47,15 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Pickup", meta = (ClampMin = "50.0"))
     float CrownPickupRadius = 180.0f;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Alliance|Rules")
+    bool bAllowFriendlyFire = false;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Alliance|Rules", meta = (ClampMin = "100.0"))
+    float AllianceOfferDistance = 1000.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Scoring", meta = (ClampMin = "0.0"))
+    float EliminationScore = 1.0f;
+
     UFUNCTION(BlueprintCallable, Category = "Crown")
     bool BeginCrownChannel(AController* ClaimingController);
 
@@ -58,7 +68,19 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Crown")
     void DropCrown(AController* HolderController);
 
-    void HandlePlayerEliminated(AController* EliminatedController);
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    bool RequestAllianceOffer(AController* Proposer, APlayerState* TargetPlayerState);
+
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    bool AcceptAllianceOffer(AController* Accepter);
+
+    UFUNCTION(BlueprintCallable, Category = "Alliance")
+    void BreakAlliance(AController* RequestingController);
+
+    UFUNCTION(BlueprintPure, Category = "Alliance")
+    bool AreAllied(const APlayerState* First, const APlayerState* Second) const;
+
+    void HandlePlayerEliminated(AController* EliminatedController, AController* KillerController);
 
 private:
     float CrownDroppedElapsedSeconds = 0.0f;
@@ -69,6 +91,8 @@ private:
     bool IsControllerAlive(const AController* Controller) const;
     bool IsAtCrownAltar(const AController* Controller) const;
     bool IsCrownContestOpen(const ACalamityGameState* State) const;
+    AController* FindControllerForPlayerState(const APlayerState* PlayerState) const;
+    bool IsInAlliance(const APlayerState* PlayerState) const;
     void SetWinner(APlayerState* Winner);
     void ResolveTimeout();
     void UpdateCrownChannel(float DeltaSeconds, ACalamityGameState* State);

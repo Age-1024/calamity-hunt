@@ -13,4 +13,6 @@ void ACalamityGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACalamityGameState, CrownHoldProgressSeconds);
     DOREPLIFETIME(ACalamityGameState, CrownChannelProgressSeconds);
     DOREPLIFETIME(ACalamityGameState, MatchElapsedSeconds);
+    DOREPLIFETIME(ACalamityGameState, Alliances);
+    DOREPLIFETIME(ACalamityGameState, AllianceOffers);
 }
