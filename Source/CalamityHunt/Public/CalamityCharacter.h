@@ -1,5 +1,4 @@
 // Copyright (c) 2026 Age-1024. Licensed under the MIT License.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -13,34 +12,34 @@ UCLASS()
 class CALAMITYHUNT_API ACalamityCharacter : public ACharacter
 {
     GENERATED_BODY()
-
 public:
     ACalamityCharacter();
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category = "Combat", meta = (ClampMin = "1.0")) float MaxHealth = 100.0f;
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat") float Health = 100.0f;
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat") bool bEliminated = false;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (ClampMin = "0.0")) float BaseWeaponDamage = 25.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (ClampMin = "1.0")) float WeaponRange = 10000.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0.1")) float FireIntervalSeconds = 0.25f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "1")) int32 MagazineSize = 12;
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat|Weapon") int32 AmmoInMagazine = 12;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0")) int32 InitialReserveAmmo = 48;
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat|Weapon") int32 ReserveAmmo = 48;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0.1")) float ReloadDurationSeconds = 1.5f;
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Creature|Taming") int32 TamingItems = 1;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category="Combat", meta=(ClampMin="1.0")) float MaxHealth=100.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") float Health=100.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") bool bEliminated=false;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat", meta=(ClampMin="0.0")) float BaseWeaponDamage=25.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat", meta=(ClampMin="1.0")) float WeaponRange=10000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="0.1")) float FireIntervalSeconds=0.25f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="1")) int32 MagazineSize=12;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat|Weapon") int32 AmmoInMagazine=12;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="0")) int32 InitialReserveAmmo=48;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat|Weapon") int32 ReserveAmmo=48;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="0")) int32 MaxReserveAmmo=120;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="0.1")) float ReloadDurationSeconds=1.5f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Creature|Taming") int32 TamingItems=1;
 
-    UFUNCTION(BlueprintCallable, Category = "Combat") void RequestFire();
-    UFUNCTION(BlueprintCallable, Category = "Combat|Weapon") void RequestReload();
-    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown") void RequestBeginCrownChannel();
-    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown") void RequestCancelCrownChannel();
-    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown") void RequestPickupDroppedCrown();
-    UFUNCTION(BlueprintCallable, Category = "Alliance") void RequestAllianceOffer(APlayerState* TargetPlayerState);
-    UFUNCTION(BlueprintCallable, Category = "Alliance") void RequestAcceptAlliance();
-    UFUNCTION(BlueprintCallable, Category = "Alliance") void RequestBreakAlliance();
-    UFUNCTION(BlueprintCallable, Category = "Creature|Taming") void RequestTameCreature(ACalamityCreature* Creature);
-    UFUNCTION(BlueprintPure, Category = "Combat") bool IsEliminated() const { return bEliminated; }
-    UFUNCTION(BlueprintPure, Category = "Combat") float GetHealth() const { return Health; }
-
+    UFUNCTION(BlueprintCallable, Category="Combat") void RequestFire();
+    UFUNCTION(BlueprintCallable, Category="Combat") void RequestReload();
+    UFUNCTION(BlueprintCallable, Category="Crown") void RequestBeginCrownChannel();
+    UFUNCTION(BlueprintCallable, Category="Crown") void RequestCancelCrownChannel();
+    UFUNCTION(BlueprintCallable, Category="Crown") void RequestPickupDroppedCrown();
+    UFUNCTION(BlueprintCallable, Category="Alliance") void RequestAllianceOffer(APlayerState* Target);
+    UFUNCTION(BlueprintCallable, Category="Alliance") void RequestAcceptAlliance();
+    UFUNCTION(BlueprintCallable, Category="Alliance") void RequestBreakAlliance();
+    UFUNCTION(BlueprintCallable, Category="Creature") void RequestTameCreature(ACalamityCreature* Creature);
+    UFUNCTION(BlueprintPure, Category="Combat") bool IsEliminated() const { return bEliminated; }
+    UFUNCTION(BlueprintPure, Category="Combat") float GetHealth() const { return Health; }
+    int32 AddReserveAmmo(int32 Amount);
     virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -50,15 +49,14 @@ protected:
     UFUNCTION(Server, Reliable) void ServerBeginCrownChannel();
     UFUNCTION(Server, Reliable) void ServerCancelCrownChannel();
     UFUNCTION(Server, Reliable) void ServerPickupDroppedCrown();
-    UFUNCTION(Server, Reliable) void ServerRequestAllianceOffer(APlayerState* TargetPlayerState);
+    UFUNCTION(Server, Reliable) void ServerRequestAllianceOffer(APlayerState* Target);
     UFUNCTION(Server, Reliable) void ServerAcceptAlliance();
     UFUNCTION(Server, Reliable) void ServerBreakAlliance();
     UFUNCTION(Server, Reliable) void ServerTameCreature(ACalamityCreature* Creature);
-
 private:
-    float LastServerFireTime = -1000.0f;
-    bool bIsReloading = false;
+    float LastServerFireTime=-1000.0f;
+    bool bIsReloading=false;
     void FireAuthoritative();
     void ReloadAuthoritative();
-    void Eliminate(AController* KillerController);
+    void Eliminate(AController* Killer);
 };

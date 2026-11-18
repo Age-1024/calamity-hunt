@@ -1,13 +1,12 @@
-# 修复与功能更新记录
+# 灰盒原型实现状态
 
-## 本次修复：觉醒源 RepNotify ��范围配置
+## 本次新增：弹药补给点
 
-- 将 `bConsumed` 改为 `ReplicatedUsing=OnRep_Consumed`，客户端收到状态变化后隐藏已消耗觉醒源并关闭碰撞。
-- 服务端成功授予后显式调用同一状态应用函数，因为服务端本地属性赋值不会自动执行 RepNotify。
-- `OnConstruction` 根据 `UseRadius` 更新球形组件半径，并按配置印记显示不同的中文灰盒标签。
-- 授予前服务端额外确认请求者是存活的 `ACalamityCharacter`，并再次按配置半径校验。
-- 成功消耗后调用 `ForceNetUpdate`，请求尽快同步变化。
+- 新增可放置、复制的 `ACalamityAmmoPickup`，角色进入触发范围后服务端发放备用弹药。
+- 玩家备用弹药达到上限或已淘汰时不消耗补给点。
+- 补给点支持配置数量和重生间隔；重生时恢复显示与碰撞。
+- 同时统一 GameState、GameMode、Character 的接口与复制字段，补齐联盟、皇印、击杀计分、弹药、换弹和驯服代码间的声明/调用关系，避免近期变更中头文件与实现不匹配。
 
-## 未验证事项
+## 验证说明
 
-这是代码级修正；没有 Unreal Engine 5.5 环境，未执行 UHT、C++ 构建或 PIE 多客户端测试。需要验证 RepNotify、关卡实例属性和碰撞组件行为。此前发现的其他跨文件接口/构建问题仍需以本地完整编译结果为准。
+这是静态整合，没有 UE 5.5 构建环境，尚未运行 UHT、C++ 编译或多人 PIE 测试。优先验证 RPC、USTRUCT 数组复制、Overlap 委托、Actor Timer、GameMode Logout 覆盖和 Dedicated Server 的拾取竞争。
