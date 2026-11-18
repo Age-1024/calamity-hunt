@@ -52,13 +52,15 @@ void ACalamityGameMode::Tick(float DeltaSeconds)
         State->CurrentPhase = ECalamityMatchPhase::Scavenging;
     }
 
+    UpdateCrownChannel(DeltaSeconds, State);
+
     if (bCrownIsDropped)
     {
         CrownDroppedElapsedSeconds += DeltaSeconds;
         if (CrownDroppedElapsedSeconds >= CrownResetAfterDropSeconds)
         {
             // Graybox reset: clearing the holder represents server-side return to the altar.
-            // A world pickup actor and altar transform will be added with the interaction/map pass.
+            // A physical pickup actor will be added in a later interaction pass.
             State->CrownHolder = nullptr;
             State->CrownHoldProgressSeconds = 0.0f;
             bCrownIsDropped = false;
@@ -76,7 +78,7 @@ void ACalamityGameMode::Tick(float DeltaSeconds)
     }
 }
 
-bool ACalamityGameMode::TryClaimCrown(AController* ClaimingController)
+bool ACalamityGameMode::BeginCrownChannel(AController* ClaimingController)
 {
     if (!HasAuthority() || !ClaimingController || !IsControllerAlive(ClaimingController))
     {
@@ -84,16 +86,72 @@ bool ACalamityGameMode::TryClaimCrown(AController* ClaimingController)
     }
 
     ACalamityGameState* State = GetCalamityGameState();
-    if (!State || State->CurrentPhase < ECalamityMatchPhase::CrownContest || State->CrownHolder)
+    if (!State || !IsCrownContestOpen(State) || State->CrownHolder || !IsAtCrownAltar(ClaimingController))
     {
         return false;
     }
 
-    State->CrownHolder = ClaimingController->PlayerState;
-    State->CrownHoldProgressSeconds = 0.0f;
-    bCrownIsDropped = false;
-    CrownDroppedElapsedSeconds = 0.0f;
-    return State->CrownHolder != nullptr;
+    if (State->CrownChannelingPlayer && State->CrownChannelingPlayer != ClaimingController->PlayerState)
+    {
+        return false;
+    }
+
+    State->CrownChannelingPlayer = ClaimingController->PlayerState;
+    State->CrownChannelProgressSeconds = 0.0f;
+    return true;
+}
+
+void ACalamityGameMode::CancelCrownChannel(AController* ClaimingController)
+{
+    if (!HasAuthority() || !ClaimingController)
+    {
+        return;
+    }
+
+    ACalamityGameState* State = GetCalamityGameState();
+    if (State && State->CrownChannelingPlayer == ClaimingController->PlayerState)
+    {
+        State->CrownChannelingPlayer = nullptr;
+        State->CrownChannelProgressSeconds = 0.0f;
+    }
+}
+
+void ACalamityGameMode::UpdateCrownChannel(float DeltaSeconds, ACalamityGameState* State)
+{
+    if (!State || !State->CrownChannelingPlayer)
+    {
+        return;
+    }
+
+    AController* ChannelingController = nullptr;
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* PC = It->Get();
+        if (PC && PC->PlayerState == State->CrownChannelingPlayer)
+        {
+            ChannelingController = PC;
+            break;
+        }
+    }
+
+    if (!ChannelingController || !IsControllerAlive(ChannelingController) ||
+        !IsAtCrownAltar(ChannelingController) || !IsCrownContestOpen(State) || State->CrownHolder)
+    {
+        State->CrownChannelingPlayer = nullptr;
+        State->CrownChannelProgressSeconds = 0.0f;
+        return;
+    }
+
+    State->CrownChannelProgressSeconds += DeltaSeconds;
+    if (State->CrownChannelProgressSeconds >= CrownChannelDurationSeconds)
+    {
+        State->CrownHolder = State->CrownChannelingPlayer;
+        State->CrownHoldProgressSeconds = 0.0f;
+        State->CrownChannelingPlayer = nullptr;
+        State->CrownChannelProgressSeconds = 0.0f;
+        bCrownIsDropped = false;
+        CrownDroppedElapsedSeconds = 0.0f;
+    }
 }
 
 void ACalamityGameMode::DropCrown(AController* HolderController)
@@ -132,6 +190,7 @@ void ACalamityGameMode::HandlePlayerEliminated(AController* EliminatedController
     {
         DropCrown(EliminatedController);
     }
+    CancelCrownChannel(EliminatedController);
 
     APlayerState* LastAlivePlayerState = nullptr;
     int32 AliveCount = 0;
@@ -166,6 +225,22 @@ bool ACalamityGameMode::IsControllerAlive(const AController* Controller) const
     return Character && !Character->IsEliminated();
 }
 
+bool ACalamityGameMode::IsAtCrownAltar(const AController* Controller) const
+{
+    if (!Controller || !Controller->GetPawn())
+    {
+        return false;
+    }
+    return FVector::DistSquared(Controller->GetPawn()->GetActorLocation(), CrownAltarLocation) <=
+        FMath::Square(CrownAltarUseRadius);
+}
+
+bool ACalamityGameMode::IsCrownContestOpen(const ACalamityGameState* State) const
+{
+    return State && (State->CurrentPhase == ECalamityMatchPhase::CrownContest ||
+        State->CurrentPhase == ECalamityMatchPhase::BloodMoon);
+}
+
 void ACalamityGameMode::SetWinner(APlayerState* Winner)
 {
     if (!HasAuthority())
@@ -176,6 +251,8 @@ void ACalamityGameMode::SetWinner(APlayerState* Winner)
     {
         State->MatchWinner = Winner;
         State->CurrentPhase = ECalamityMatchPhase::Finished;
+        State->CrownChannelingPlayer = nullptr;
+        State->CrownChannelProgressSeconds = 0.0f;
     }
 }
 
@@ -193,8 +270,7 @@ void ACalamityGameMode::ResolveTimeout()
         return;
     }
 
-    // Temporary, explicit graybox tie-breaker: most remaining health, then lowest PlayerId.
-    // Replace with the documented contribution-score rule before public competitive testing.
+    // Temporary graybox tie-breaker: most remaining health, then lowest PlayerId.
     APlayerState* BestPlayerState = nullptr;
     float BestHealth = -1.0f;
     int32 BestPlayerId = MAX_int32;

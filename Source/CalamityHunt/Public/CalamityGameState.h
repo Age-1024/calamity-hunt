@@ -27,11 +27,17 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category = "Crown")
     TObjectPtr<APlayerState> CrownHolder = nullptr;
 
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Crown")
+    TObjectPtr<APlayerState> CrownChannelingPlayer = nullptr;
+
     UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
     TObjectPtr<APlayerState> MatchWinner = nullptr;
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category = "Crown")
     float CrownHoldProgressSeconds = 0.0f;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Crown")
+    float CrownChannelProgressSeconds = 0.0f;
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
     float MatchElapsedSeconds = 0.0f;

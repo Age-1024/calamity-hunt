@@ -33,8 +33,21 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Rules", meta = (ClampMin = "1.0"))
     float CrownResetAfterDropSeconds = 30.0f;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Altar")
+    FVector CrownAltarLocation = FVector::ZeroVector;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Altar", meta = (ClampMin = "50.0"))
+    float CrownAltarUseRadius = 250.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crown|Altar", meta = (ClampMin = "0.1"))
+    float CrownChannelDurationSeconds = 5.0f;
+
+    // Called only on the server after the owning character forwards an interaction request.
     UFUNCTION(BlueprintCallable, Category = "Crown")
-    bool TryClaimCrown(AController* ClaimingController);
+    bool BeginCrownChannel(AController* ClaimingController);
+
+    UFUNCTION(BlueprintCallable, Category = "Crown")
+    void CancelCrownChannel(AController* ClaimingController);
 
     UFUNCTION(BlueprintCallable, Category = "Crown")
     void DropCrown(AController* HolderController);
@@ -47,6 +60,9 @@ private:
 
     ACalamityGameState* GetCalamityGameState() const;
     bool IsControllerAlive(const AController* Controller) const;
+    bool IsAtCrownAltar(const AController* Controller) const;
+    bool IsCrownContestOpen(const ACalamityGameState* State) const;
     void SetWinner(APlayerState* Winner);
     void ResolveTimeout();
+    void UpdateCrownChannel(float DeltaSeconds, ACalamityGameState* State);
 };

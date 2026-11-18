@@ -12,6 +12,8 @@ ACalamityCharacter::ACalamityCharacter()
     bReplicates = true;
     SetReplicateMovement(true);
     Health = MaxHealth;
+    AmmoInMagazine = MagazineSize;
+    ReserveAmmo = InitialReserveAmmo;
 }
 
 void ACalamityCharacter::RequestFire()
@@ -35,12 +37,110 @@ void ACalamityCharacter::ServerFire_Implementation()
     FireAuthoritative();
 }
 
-void ACalamityCharacter::FireAuthoritative()
+void ACalamityCharacter::RequestReload()
 {
-    if (!HasAuthority() || bEliminated || !GetWorld())
+    if (HasAuthority())
+    {
+        ReloadAuthoritative();
+    }
+    else
+    {
+        ServerReload();
+    }
+}
+
+void ACalamityCharacter::ServerReload_Implementation()
+{
+    ReloadAuthoritative();
+}
+
+void ACalamityCharacter::ReloadAuthoritative()
+{
+    if (!HasAuthority() || bEliminated || bIsReloading || AmmoInMagazine >= MagazineSize || ReserveAmmo <= 0)
     {
         return;
     }
+
+    bIsReloading = true;
+    FTimerHandle ReloadTimer;
+    TWeakObjectPtr<ACalamityCharacter> WeakThis(this);
+    GetWorldTimerManager().SetTimer(ReloadTimer, [WeakThis]()
+    {
+        ACalamityCharacter* Character = WeakThis.Get();
+        if (!Character || !Character->HasAuthority())
+        {
+            return;
+        }
+        Character->bIsReloading = false;
+        if (Character->bEliminated)
+        {
+            return;
+        }
+        const int32 Needed = Character->MagazineSize - Character->AmmoInMagazine;
+        const int32 Loaded = FMath::Min(Needed, Character->ReserveAmmo);
+        Character->AmmoInMagazine += Loaded;
+        Character->ReserveAmmo -= Loaded;
+    }, ReloadDurationSeconds, false);
+}
+
+void ACalamityCharacter::RequestBeginCrownChannel()
+{
+    if (HasAuthority())
+    {
+        ServerBeginCrownChannel_Implementation();
+    }
+    else
+    {
+        ServerBeginCrownChannel();
+    }
+}
+
+void ACalamityCharacter::ServerBeginCrownChannel_Implementation()
+{
+    if (bEliminated || !GetController())
+    {
+        return;
+    }
+    if (ACalamityGameMode* GameMode = GetWorld()->GetAuthGameMode<ACalamityGameMode>())
+    {
+        GameMode->BeginCrownChannel(GetController());
+    }
+}
+
+void ACalamityCharacter::RequestCancelCrownChannel()
+{
+    if (HasAuthority())
+    {
+        ServerCancelCrownChannel_Implementation();
+    }
+    else
+    {
+        ServerCancelCrownChannel();
+    }
+}
+
+void ACalamityCharacter::ServerCancelCrownChannel_Implementation()
+{
+    if (ACalamityGameMode* GameMode = GetWorld()->GetAuthGameMode<ACalamityGameMode>())
+    {
+        GameMode->CancelCrownChannel(GetController());
+    }
+}
+
+void ACalamityCharacter::FireAuthoritative()
+{
+    if (!HasAuthority() || bEliminated || bIsReloading || !GetWorld() || AmmoInMagazine <= 0)
+    {
+        return;
+    }
+
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (Now - LastServerFireTime < FireIntervalSeconds)
+    {
+        return;
+    }
+    LastServerFireTime = Now;
+    --AmmoInMagazine;
 
     const FVector Start = GetPawnViewLocation();
     const FVector Direction = GetBaseAimRotation().Vector();
@@ -93,4 +193,6 @@ void ACalamityCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACalamityCharacter, MaxHealth);
     DOREPLIFETIME(ACalamityCharacter, Health);
     DOREPLIFETIME(ACalamityCharacter, bEliminated);
+    DOREPLIFETIME(ACalamityCharacter, AmmoInMagazine);
+    DOREPLIFETIME(ACalamityCharacter, ReserveAmmo);
 }

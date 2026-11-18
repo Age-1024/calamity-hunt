@@ -8,7 +8,9 @@ void ACalamityGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACalamityGameState, CurrentPhase);
     DOREPLIFETIME(ACalamityGameState, CrownHolder);
+    DOREPLIFETIME(ACalamityGameState, CrownChannelingPlayer);
     DOREPLIFETIME(ACalamityGameState, MatchWinner);
     DOREPLIFETIME(ACalamityGameState, CrownHoldProgressSeconds);
+    DOREPLIFETIME(ACalamityGameState, CrownChannelProgressSeconds);
     DOREPLIFETIME(ACalamityGameState, MatchElapsedSeconds);
 }

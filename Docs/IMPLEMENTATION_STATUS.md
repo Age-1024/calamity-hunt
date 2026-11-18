@@ -1,12 +1,17 @@
-# Source implementation status
+# 灰盒原型实现状态
 
-Included in the initial C++ graybox:
+## 本次已实现
 
-- Replicated match phase, crown holder, winner and timer progress.
-- Server-side hitscan request, damage application and character elimination.
-- Last-survivor winner selection.
-- Crown claim/drop API and blood-moon continuous hold timer.
-- Dropped-crown reset timer (state reset only; no physical pickup actor yet).
-- Timeout placeholder: crown holder wins; otherwise highest remaining health, then lowest PlayerId.
+- 皇印不再是瞬间领取：进入祭坛范围后请求引导，服务端持续检查玩家存活、阶段与距离，离开范围或玩家失效则中断。
+- 祭坛位置、使用半径和引导时长可在 GameMode 默认属性中配置。
+- 引导玩家与进度通过 GameState 复制，供 HUD 显示。
+- 加入弹匣、备用弹药、服务器射速限制与服务器计时换弹。
+- 客户端仅发送开火、换弹、引导/取消引导意图，服务器验证状态后处理。
 
-Not yet included: altar proximity/channel validation, physical crown pickup, fire rate/ammo/reload, armor, death spectating, alliance, AI creatures, taming, awakening, contribution score, UI, input assets or a map. Blueprint-callable crown APIs must only be invoked through server-authoritative interactions with server-side validation in a production build.
+## 已知限制与待做
+
+- CrownAltarLocation 暂时是 GameMode 配置坐标；尚无实体祭坛 Actor、交互提示或可视进度 UI。
+- 皇印仍以 GameState 持有者状态表达，没有物理掉落物与地面拾取。
+- ReloadTimer 是服务端本地计时，需在 UE 5.5 构建后验证 timer lambda 和网络表现。
+- 尚无弹药拾取、枪械 Actor、弹道/命中反馈、队伍/结盟、观战、异灵、驯服、觉醒、贡献分或正式反作弊。
+- C++ 代码尚未在 Unreal Engine 环境编译或多人压测；合入前需执行 UHT、Editor build 和 Dedicated Server 客户端测试。

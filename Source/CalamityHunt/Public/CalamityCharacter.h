@@ -29,8 +29,35 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (ClampMin = "1.0"))
     float WeaponRange = 10000.0f;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0.1"))
+    float FireIntervalSeconds = 0.25f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "1"))
+    int32 MagazineSize = 12;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat|Weapon")
+    int32 AmmoInMagazine = 12;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0"))
+    int32 InitialReserveAmmo = 48;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Combat|Weapon")
+    int32 ReserveAmmo = 48;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Weapon", meta = (ClampMin = "0.1"))
+    float ReloadDurationSeconds = 1.5f;
+
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RequestFire();
+
+    UFUNCTION(BlueprintCallable, Category = "Combat|Weapon")
+    void RequestReload();
+
+    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown")
+    void RequestBeginCrownChannel();
+
+    UFUNCTION(BlueprintCallable, Category = "Interaction|Crown")
+    void RequestCancelCrownChannel();
 
     UFUNCTION(BlueprintPure, Category = "Combat")
     bool IsEliminated() const { return bEliminated; }
@@ -45,7 +72,20 @@ protected:
     UFUNCTION(Server, Reliable)
     void ServerFire();
 
+    UFUNCTION(Server, Reliable)
+    void ServerReload();
+
+    UFUNCTION(Server, Reliable)
+    void ServerBeginCrownChannel();
+
+    UFUNCTION(Server, Reliable)
+    void ServerCancelCrownChannel();
+
 private:
+    float LastServerFireTime = -1000.0f;
+    bool bIsReloading = false;
+
     void FireAuthoritative();
+    void ReloadAuthoritative();
     void Eliminate();
 };
