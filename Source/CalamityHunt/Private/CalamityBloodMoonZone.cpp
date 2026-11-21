@@ -27,35 +27,70 @@ ACalamityBloodMoonZone::ACalamityBloodMoonZone()
     StatusLabel->SetHorizontalAlignment(EHTA_Center);
     StatusLabel->SetWorldSize(48.0f);
     StatusLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 180.0f));
-    StatusLabel->SetText(FText::FromString(TEXT("BLOOD MOON / 血月安全区")));
+}
+
+void ACalamityBloodMoonZone::BeginPlay()
+{
+    Super::BeginPlay();
+    if (HasAuthority())
+    {
+        const float SafeInitialRadius = FMath::Max(100.0f, InitialRadius);
+        CurrentRadius = SafeInitialRadius;
+        bZoneActive = false;
+        BloodMoonElapsedSeconds = 0.0f;
+        DamageAccumulator = 0.0f;
+    }
+    UpdateZonePresentation();
 }
 
 void ACalamityBloodMoonZone::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+
     if (!HasAuthority() || !GetWorld())
     {
         return;
     }
 
-    ACalamityGameMode* GameMode = GetWorld()->GetAuthGameMode<ACalamityGameMode>();
+    const ACalamityGameMode* GameMode = GetWorld()->GetAuthGameMode<ACalamityGameMode>();
     ACalamityGameState* GameState = GetWorld()->GetGameState<ACalamityGameState>();
-    if (!GameMode || !GameState || GameState->CurrentPhase == ECalamityMatchPhase::Finished ||
-        GameState->CurrentPhase != ECalamityMatchPhase::BloodMoon)
+    if (!GameMode || !GameState || GameState->CurrentPhase == ECalamityMatchPhase::Finished)
     {
         if (bZoneActive)
         {
             bZoneActive = false;
             DamageAccumulator = 0.0f;
-            OnRep_ZoneState();
+            UpdateZonePresentation();
             ForceNetUpdate();
         }
         return;
     }
 
-    const float BloodMoonElapsed = FMath::Max(0.0f, GameState->MatchElapsedSeconds - GameMode->BloodMoonStartSeconds);
-    const float ShrinkAlpha = FMath::Clamp(BloodMoonElapsed / FMath::Max(1.0f, ShrinkDurationSeconds), 0.0f, 1.0f);
-    const float NewRadius = FMath::Lerp(FMath::Max(100.0f, InitialRadius), FMath::Max(100.0f, FinalRadius), ShrinkAlpha);
+    if (GameState->CurrentPhase != ECalamityMatchPhase::BloodMoon)
+    {
+        if (bZoneActive)
+        {
+            bZoneActive = false;
+            BloodMoonElapsedSeconds = 0.0f;
+            DamageAccumulator = 0.0f;
+            UpdateZonePresentation();
+            ForceNetUpdate();
+        }
+        else
+        {
+            UpdateZonePresentation();
+        }
+        return;
+    }
+
+    BloodMoonElapsedSeconds = FMath::Max(0.0f, GameState->MatchElapsedSeconds - GameMode->BloodMoonStartSeconds);
+
+    const float SafeInitialRadius = FMath::Max(100.0f, InitialRadius);
+    const float SafeFinalRadius = FMath::Clamp(FMath::Max(100.0f, FinalRadius), 100.0f, SafeInitialRadius);
+    const float ShrinkDuration = FMath::Max(1.0f, ShrinkDurationSeconds);
+    const float ShrinkAlpha = FMath::Clamp(BloodMoonElapsedSeconds / ShrinkDuration, 0.0f, 1.0f);
+    const float NewRadius = FMath::Lerp(SafeInitialRadius, SafeFinalRadius, ShrinkAlpha);
+
     const bool bWasActive = bZoneActive;
     const bool bRadiusChanged = !FMath::IsNearlyEqual(CurrentRadius, NewRadius, 1.0f);
     bZoneActive = true;
@@ -63,11 +98,11 @@ void ACalamityBloodMoonZone::Tick(float DeltaSeconds)
 
     if (bWasActive != bZoneActive || bRadiusChanged)
     {
-        OnRep_ZoneState();
+        UpdateZonePresentation();
         ForceNetUpdate();
     }
 
-    if (BloodMoonElapsed < DamageGraceSeconds)
+    if (BloodMoonElapsedSeconds < FMath::Max(0.0f, DamageGraceSeconds))
     {
         DamageAccumulator = 0.0f;
         return;
@@ -79,9 +114,10 @@ void ACalamityBloodMoonZone::Tick(float DeltaSeconds)
     {
         return;
     }
-    DamageAccumulator = FMath::Fmod(DamageAccumulator, DamageInterval);
 
+    DamageAccumulator = FMath::Fmod(DamageAccumulator, DamageInterval);
     const float RadiusSquared = FMath::Square(CurrentRadius);
+
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         APlayerController* PlayerController = It->Get();
@@ -95,34 +131,35 @@ void ACalamityBloodMoonZone::Tick(float DeltaSeconds)
         const float PlanarDistanceSquared = FMath::Square(Offset.X) + FMath::Square(Offset.Y);
         if (PlanarDistanceSquared > RadiusSquared)
         {
-            UGameplayStatics::ApplyDamage(Character, FMath::Max(0.0f, OutsideDamage), nullptr, this, nullptr);
+            UGameplayStatics::ApplyPointDamage(Character, FMath::Max(0.0f, OutsideDamage), Offset.GetSafeNormal(),
+                FHitResult(), nullptr, this, NAME_None);
         }
-    }
-
-    LabelUpdateAccumulator += DeltaSeconds;
-    if (LabelUpdateAccumulator >= 1.0f)
-    {
-        LabelUpdateAccumulator = 0.0f;
-        UpdateLabel();
     }
 }
 
 void ACalamityBloodMoonZone::OnRep_ZoneState()
 {
-    UpdateLabel();
+    UpdateZonePresentation();
 }
 
-void ACalamityBloodMoonZone::UpdateLabel()
+void ACalamityBloodMoonZone::UpdateZonePresentation()
 {
     if (!StatusLabel)
     {
         return;
     }
+
+    if (RootSphere)
+    {
+        RootSphere->SetSphereRadius(FMath::Max(1.0f, bZoneActive ? CurrentRadius : InitialRadius));
+    }
+
     if (!bZoneActive)
     {
         StatusLabel->SetText(FText::FromString(TEXT("BLOOD MOON / 等待血月")));
         return;
     }
+
     StatusLabel->SetText(FText::FromString(FString::Printf(TEXT("安全区半径 / %.0f"), CurrentRadius)));
 }
 
@@ -131,4 +168,5 @@ void ACalamityBloodMoonZone::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACalamityBloodMoonZone, CurrentRadius);
     DOREPLIFETIME(ACalamityBloodMoonZone, bZoneActive);
+    DOREPLIFETIME(ACalamityBloodMoonZone, BloodMoonElapsedSeconds);
 }
